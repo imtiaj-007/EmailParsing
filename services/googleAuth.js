@@ -22,6 +22,10 @@ const CREDENTIALS_PATH = path.join(process.cwd(), './credentials/clientSecret.js
 const loadSavedCredentials = async ()=> {
     try {
         const content = await fs.readFile(TOKEN_PATH);
+        console.log(content)
+        if(!content)
+            return null;
+
         const credentials = JSON.parse(content);
         return google.auth.fromJSON(credentials);
     } catch (error) {
@@ -68,6 +72,7 @@ const authorizeUser = async ()=> {
         if(client.credentials) {
             await saveCredentials(client);
         }
+        console.log(client);
         return client;
 
     } catch (error) {

@@ -3,12 +3,13 @@ const authorizeUser = require('../services/googleAuth');
 const googleAuth = async (req, res)=> {
     try {
         const client = await authorizeUser();
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             client
         })
     } catch (error) {
         console.log(error);
+        return res.status(500).send(error);
     }
 }
 

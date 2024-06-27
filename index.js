@@ -1,15 +1,21 @@
-require('dotenv').config();
-const express = require('express')
-const userRouter = require('./routers/user');
-
-const PORT = process.env.PORT;
-
-const app = express();
+const replyToUnreadMails = require('./services/gmailService');
+const authorizeUser = require('./services/googleAuth');
 
 
-app.use('/user', userRouter);
-
-app.listen(PORT, ()=> {
-    console.log(`Server started at PORT: ${PORT}`);
+async function main() {
+    const auth = await authorizeUser();
+    await replyToUnreadMails(auth);
+}
+main().catch((error)=>{
+    console.log(error);
 })
 
+
+
+// const intervalId = setInterval(()=> {
+//     async function sendMail() {
+//         const auth = await authorizeUser();
+//         await replyToUnreadMails(auth);
+//     }
+//     sendMail();
+// }, 100000)
