@@ -10,12 +10,3 @@ main().catch((error)=>{
     console.log(error);
 })
 
-
-
-// const intervalId = setInterval(()=> {
-//     async function sendMail() {
-//         const auth = await authorizeUser();
-//         await replyToUnreadMails(auth);
-//     }
-//     sendMail();
-// }, 100000)

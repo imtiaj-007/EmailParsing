@@ -1,5 +1,5 @@
 const { google } = require('googleapis');
-const { getAILabel } = require('./geminiAI');
+const { getAILabel, generateReply } = require('./geminiAI');
 
 
 // Send mail to a reciepent
@@ -45,8 +45,12 @@ const createLabel = async (auth, label_name) => {
             const res = await gmail.users.labels.list({
                 userId: 'me'
             })
-            const label = res.data.labels.find((label) => label.name === label_name);
-            return label.id;
+            let labelId;
+            res.data.labels.map((label) => {
+                if (label === label_name)
+                    labelId = label.id;
+            })
+            return labelId;
         } else {
             throw error;
         }
@@ -119,29 +123,43 @@ const replyToUnreadMails = async (auth) => {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        q: '-in:chat -from:me '
+        q: 'is:unread '
     });
-
-    const interestedlabelId = await createLabel(auth, "Interested");
-    const notInterestedlabelId = await createLabel(auth, "Not Interested");
-    const moreInformationlabelId = await createLabel(auth, "More Information");
 
     const unreadMails = res.data.messages || [];
     console.log(unreadMails);
 
-
+    let delay = 0;
     for (let mail of unreadMails) {
-        const { subject, from, data } = await getMessage(auth, mail.id);
-        console.log(subject, " : ", data);
-        
-        const label = await getAILabel(data);   // Generate proper label from Gemini AI
-        await addLabel(auth, mail, label);      // Add the label to the mail
 
+        async function doTasks(mail) {
+            const { subject, from, data } = await getMessage(auth, mail.id);
+            const replyTo = from.match(/<(.*)>/)[1];
+            const modSubject = `Re: ${subject}`;
+
+            const label = await getAILabel(data);               // Generate proper label from Gemini AI            
+            const labelId = await createLabel(auth, label);     // Get the label Id    
+
+            await addLabel(auth, mail, labelId);                // Add the label to the mail
+
+            const replyBody = await generateReply(data);        // Generate reply using AI
+            await sendMail(auth, replyTo, modSubject, replyBody);  // Finally send the reply to reciepents
+
+            await gmail.users.messages.modify({                 // Set the mail as read
+                id: mail.id,
+                userId: 'me',
+                requestBody: {
+                    removeLabelIds: ['UNREAD'],
+                },
+            });
+        }
+
+        setTimeout(async () => {        // Delaying the execution of each mail
+            await doTasks(mail);
+          }, delay);
         
-        
+          delay += 15000; // Add 15 seconds to delay for next iteration
     }
-
-    // const interestedMails = await getInterestdMails(auth);    
 }
 
 
