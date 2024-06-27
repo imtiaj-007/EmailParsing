@@ -1,8 +1,10 @@
 const { google } = require('googleapis');
+const { getAILabel } = require('./geminiAI');
+
 
 // Send mail to a reciepent
 const sendMail = async (auth, reciever, subject, mailBody) => {
-    const gmail = google.gmail({ version: 'v1', auth });    
+    const gmail = google.gmail({ version: 'v1', auth });
 
     const rawMessage = [
         `From: me`,
@@ -25,7 +27,7 @@ const sendMail = async (auth, reciever, subject, mailBody) => {
 }
 
 
-const createLabel = async (auth, label_name)=> {
+const createLabel = async (auth, label_name) => {
     const gmail = google.gmail({ version: 'v1', auth });
     try {
         const res = await gmail.users.labels.create({
@@ -91,29 +93,55 @@ const getTestMails = async (auth) => {
     return res.data.messages || [];
 }
 
+// Get Message from a mail
+const getMessage = async (auth, mailId) => {
+    const gmail = google.gmail({ version: 'v1', auth });
+    const res = await gmail.users.messages.get({
+        userId: 'me',
+        id: mailId,
+        format: 'full'
+    });
+
+    // Get Sender and Subject from headers
+    const subject = res.data.payload.headers.find((header) => header.name === 'Subject').value;
+    const from = res.data.payload.headers.find((header) => header.name === 'From').value;
+
+    // Get Message body from payload part
+    const rawBody = res.data.payload.parts[0].body.data;
+    const data = Buffer.from(rawBody, 'base64').toString('ascii');
+
+    return { subject, from, data };
+}
+
 
 // Reply to Unread Mails
 const replyToUnreadMails = async (auth) => {
     const gmail = google.gmail({ version: 'v1', auth });
     const res = await gmail.users.messages.list({
         userId: 'me',
-        q: '-is:unread '
-    });
-    
-    // const interestedlabelId = await createLabel(auth, "Interested");
-    // const notInterestedlabelId = await createLabel(auth, "Not Interested");
-    // const moreInformationlabelId = await createLabel(auth, "More Information");
-    const testlabelId = await createLabel(auth, "Test");
-
-    const unreadMails = await getTestMails(auth);
-    unreadMails.map(async (mail) => {
-        await addLabel(auth, mail, testlabelId);
+        q: '-in:chat -from:me '
     });
 
-    // const interestedMails = await getInterestdMails(auth);
-    const testMails = await getTestMails(auth);
-    console.log(testMails);
+    const interestedlabelId = await createLabel(auth, "Interested");
+    const notInterestedlabelId = await createLabel(auth, "Not Interested");
+    const moreInformationlabelId = await createLabel(auth, "More Information");
 
+    const unreadMails = res.data.messages || [];
+    console.log(unreadMails);
+
+
+    for (let mail of unreadMails) {
+        const { subject, from, data } = await getMessage(auth, mail.id);
+        console.log(subject, " : ", data);
+        
+        const label = await getAILabel(data);   // Generate proper label from Gemini AI
+        await addLabel(auth, mail, label);      // Add the label to the mail
+
+        
+        
+    }
+
+    // const interestedMails = await getInterestdMails(auth);    
 }
 
 
